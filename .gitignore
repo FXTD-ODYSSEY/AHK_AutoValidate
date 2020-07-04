@@ -1,0 +1,10 @@
+.vscode/
+.history/
+
+*.py[cod]
+
+build/
+dist/
+*.spec
+
+*.trace.*
