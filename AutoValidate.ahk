@@ -3,6 +3,7 @@
 
 Global ProgramTile := "校验编辑器"
 Global CurrentFileName := "未命名"
+Global Win_ID := -1
 
 ;#Warn  ; Recommended for catching common errors.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
@@ -13,7 +14,6 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 
 Menu, MyContextMenu, Add, 添加配置                   Ctrl + G, AddRow
 Menu, MyContextMenu, Add, 删除选择                   Ctrl + D, ContextClearRows
-
 
 
 ; Create the sub-menus for the menu bar:
@@ -56,18 +56,36 @@ Gui, Add, Listview,  h350 w616 W600 R20 +Grid -Readonly vListWidget hwndHLV1, �
 gui, add, text, section vMacroLabel, 录制文件路径 :  ; Save this control's position and start a new section.
 gui, add, edit, ys vMacroEdit ; Start a new column within this section.
 gui, add, button, ys gMacroButton vMacroButton , 执行路径 (Ctrl + R)  ; Start a new column within this section.
-
-; Gui, Add, Listview, h350 w616 W600 R20 +Grid -Readonly vListWidget2 hwndHLV2, 序号|选项名称|校验规则
-LV_Add("",1,"1234")
-LV_Add("",2,"12345")
-LV_Add("",3,"123456")
-LV_Add("",4,"1234567")
-LV_Add("",5,"12345678")
-If !(LVEDIT_INIT(HLV1,True))
-   MsgBox, %ErrorLevel%
-
-
 Gui, Show,,  %ProgramTile%  - *%CurrentFileName%
+
+; 初始化配置
+Gosub, Initialize
+
+return
+
+; --------------------------------
+; NOTE 初始化程序
+; --------------------------------
+
+Initialize:
+; 初始化路径
+IniRead, MacroPath, %A_ScriptDir%\AutoValidate.ini, common, MacroPath
+if (FileExist(MacroPath))
+	GuiControl,, MacroEdit, %MacroPath%
+
+IniRead, SelectedFileName, %A_ScriptDir%\AutoValidate.ini, common, CSVPath
+if (FileExist(SelectedFileName))
+	Gosub, FileRead
+
+; LV_Add("",1,"1234")
+; LV_Add("",2,"12345")
+; LV_Add("",3,"123456")
+; LV_Add("",4,"1234567")
+; LV_Add("",5,"12345678")
+; If !(LVEDIT_INIT(HLV1,True))
+;    MsgBox, %ErrorLevel%
+
+WinGet, Win_ID , ID , A
 
 return
 
@@ -84,6 +102,8 @@ Menu, MyContextMenu, Show, %A_GuiX%, %A_GuiY%
 return
 
 ^G::
+IfWinNotActive ahk_id %Win_ID%
+	return
 AddRow:
 ; Gui,2:Default
 ControlGet, rowCount, List, Count, , % "ahk_id " . HLV1
@@ -98,6 +118,8 @@ If !(LVEDIT_INIT(HLV1,True))
 return
 
 ^D::
+IfWinNotActive ahk_id %Win_ID%
+	return
 ContextClearRows:
 
 ControlGet, SelectedItems, List, Selected, , % "ahk_id " . HLV1
@@ -130,6 +152,8 @@ return
 ; --------------------------------
 
 ^N::
+IfWinNotActive ahk_id %Win_ID%
+	return
 FileNew:
 CurrentFileName := "未命名"
 Gui, Show,,  %ProgramTile%  - *%CurrentFileName%
@@ -147,6 +171,8 @@ return
 
 
 ^O::
+IfWinNotActive ahk_id %Win_ID%
+	return
 FileOpen:
 Gui +OwnDialogs  ; Force the user to dismiss the FileSelectFile dialog before returning to the main window.
 FileSelectFile, SelectedFileName, 3,, Open File, CSV 文件 (*.csv)
@@ -177,10 +203,14 @@ Loop, Parse, Data, `n  ; Rows are delimited by linefeeds (`n).
 ; GuiControl,, MainEdit, %MainEdit%  ; Put the text into the control.
 CurrentFileName := SelectedFileName
 Gui, Show,,  %ProgramTile%  - %CurrentFileName%
+IniWrite, %SelectedFileName%, %A_ScriptDir%\AutoValidate.ini, common, CSVPath
+
 return
 
 
 ^S::
+IfWinNotActive ahk_id %Win_ID%
+	return
 FileSave:
 if not CurrentFileName or CurrentFileName == "未命名"   ; No filename selected yet, so do Save-As instead.
     Goto FileSaveAs
@@ -188,6 +218,8 @@ Gosub SaveCurrentFile
 return
 
 ^+S::
+IfWinNotActive ahk_id %Win_ID%
+	return
 FileSaveAs:
 Gui +OwnDialogs  ; Force the user to dismiss the FileSelectFile dialog before returning to the main window.
 FileSelectFile, SelectedFileName, S16,, 保存配置 , CSV 文件 (*.csv)
@@ -227,15 +259,23 @@ return
 ; NOTE 编辑菜单功能
 ; --------------------------------
 
+^E::
+IfWinNotActive ahk_id %Win_ID%
+	return
 OpenCurrentFile:
 Run %SelectedFileName%
 return
 
+^+E::
+IfWinNotActive ahk_id %Win_ID%
+	return
 OpenCurrentFileDir:
 Run %SelectedFileName%\..\
 return
 
 F5::
+IfWinNotActive ahk_id %Win_ID%
+	return
 Refresh:
 return
 
@@ -255,14 +295,16 @@ if not FileExist(MacroPath)
 	Gui +OwnDialogs  ; Force the user to dismiss the FileSelectFile dialog before returning to the main window.
 	FileSelectFile, MacroPath, S1,, 获取 AHK 录制文件, AHK 文件 (*.ahk)
 	GuiControl,, MacroEdit, %MacroPath%
+	
 }
 
 ; TODO 检查是否是 Macro AHK 文件
 
-
+FileRead, Data, %MacroPath%
 
 ; TODO 获取剪切板信息
 
+IniWrite, %MacroPath%, %A_ScriptDir%\AutoValidate.ini, common, MacroPath
 
 return
 
@@ -319,6 +361,8 @@ GuiControl, Move, MacroButton ,X%XMacroButton% Y%NewHeight%
 return
 
 ^Q::
+IfWinNotActive ahk_id %Win_ID%
+	return
 FileExit:     ; User chose "Exit" from the File menu.
 GuiClose:  ; User closed the window.
 ExitApp
