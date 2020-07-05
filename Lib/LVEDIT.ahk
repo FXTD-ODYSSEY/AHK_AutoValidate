@@ -1,4 +1,5 @@
 ﻿; ======================================================================================================================
+; https://autohotkey.com/board/topic/75262-proof-of-concept-listview-in-cell-editing-ahk-l/
 ; Namespace:      LVEDIT_
 ; AHK version:    AHK 1.1.5.+ (required)
 ; Function:       Helper functions for in-cell ListView editing

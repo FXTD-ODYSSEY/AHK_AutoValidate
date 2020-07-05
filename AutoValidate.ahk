@@ -4,23 +4,31 @@
 Global ProgramTile := "校验编辑器"
 Global CurrentFileName := "未命名"
 Global Win_ID := -1
+Global clipboard_collection := []
+Global clipboard_capture := false
 
 ;#Warn  ; Recommended for catching common errors.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 
-#Include %A_ScriptDir%\LVEDIT.ahk
-; #Include %A_ScriptDir%\monster.ahk
-#Include %A_ScriptDir%\eval.ahk
+#Include <LVEDIT>
+#Include <jsEval>
+#Include <eval>
 
-ExprInit()
+; Expression := "ie := ComObjCreate(""InternetExplorer.Application""), ie.Visible := true, ie.Navigate(""www.autohotkey.com"")"
+; MsgBox, 1, COM Object Expressions, % "Expression: `n`n" Expression "`n`n`nPress OK to execute"
+; IfMsgBox, Cancel, ExitApp
+; Result := Eval(Expression)
 
-; Math Expressions
-; VarX := "First,Second,Third,Fourth"
-Expression := """国服"" = ""国服1"""
-Result := Eval(Expression)
-MsgBox % Result[1]
+; run, www.baidu.com
+; Result := Eval("run, www.baidu.com")
+; MsgBox % Result[1]
+; return
 
+; eval 测试
+; Expression := """国服"" = ""国服1"""
+; Result := Eval(Expression)
+; MsgBox % Result[1]
 
 
 Menu, MyContextMenu, Add, 添加配置                   Ctrl + G, AddRow
@@ -43,7 +51,7 @@ Menu, EditMenu, Add, 删除选择                   Ctrl + D, ContextClearRows
 Menu, EditMenu, Add  ; Separator line.
 Menu, EditMenu, Add, 刷新                         F5, Refresh
 
-Menu, ExecMenu, Add, 选择录制文件路径         , RunMacro
+Menu, ExecMenu, Add, 选择录制 AHK 文件路径         , RunMacro
 
 Menu, HelpMenu, Add, 关于 , HelpAbout
 
@@ -64,7 +72,7 @@ Gui, +Resize  ; Make the window resizable.
 ; Gui, Add, Edit, R20 vMyEdit
 Gui, Add, Listview,  h350 w616 W600 R20 +Grid -Readonly vListWidget hwndHLV1, 序号|选项名称|校验规则|获取数据
 
-gui, add, text, section vMacroLabel, 录制文件路径 :  ; Save this control's position and start a new section.
+gui, add, text, section vMacroLabel, 录制 AHK 文件路径 ; Save this control's position and start a new section.
 gui, add, edit, ys vMacroEdit ; Start a new column within this section.
 gui, add, button, ys gMacroButton vMacroButton , 选择路径 (Ctrl + R 执行)  ; Start a new column within this section.
 Gui, Show,,  %ProgramTile%  - *%CurrentFileName%
@@ -88,15 +96,10 @@ IniRead, SelectedFileName, %A_ScriptDir%\AutoValidate.ini, common, CSVPath
 if (FileExist(SelectedFileName))
     Gosub, FileRead
 
-; LV_Add("",1,"1234")
-; LV_Add("",2,"12345")
-; LV_Add("",3,"123456")
-; LV_Add("",4,"1234567")
-; LV_Add("",5,"12345678")
-; If !(LVEDIT_INIT(HLV1,True))
-;    MsgBox, %ErrorLevel%
-
 WinGet, Win_ID , ID , A
+
+If !(LVEDIT_INIT(HLV1,True))
+   MsgBox, %ErrorLevel%
 
 return
 
@@ -124,9 +127,6 @@ LV_Add("",rowCount+1)
 If !(LVEDIT_INIT(HLV1,True))
    MsgBox, %ErrorLevel%
 
-;    ControlGet, OutputVar1, List,, SysListView321, Test.ahk
-; Filedelete, C:\GuiChoices4.txt
-; FileAppend, %OutputVar1%, C:\GuiChoices4.txt
 return
 
 #If WinActive("ahk_id" . Win_ID)
@@ -259,6 +259,7 @@ ControlGet, TotalItems , List, , , % "ahk_id " . HLV1
 TotalItems := StrReplace(TotalItems, "`t", ",")
 
 GuiControlGet, MainEdit  ; Retrieve the contents of the Edit control.
+Filedelete, %CurrentFileName%
 FileAppend, %TotalItems%, %CurrentFileName%  ; Save the contents to the file.
 return
 
@@ -335,7 +336,7 @@ NewHeight := NewHeight + 10
 YMacroEdit := NewHeight + 1
 YMacroLabel := NewHeight + 5
 XMacroButton := A_GuiWidth - 165
-WMacroEdit := XMacroButton - 110
+WMacroEdit := XMacroButton - 125
 GuiControl, Move, MacroLabel , Y%YMacroLabel%
 GuiControl, Move, MacroEdit , Y%YMacroEdit% W%WMacroEdit%
 GuiControl, Move, MacroButton ,X%XMacroButton% Y%NewHeight% 
@@ -365,19 +366,91 @@ if not FileExist(MacroPath)
     return
 }
 
-; TODO 检查是否是 Macro AHK 文件
-; TODO 优化 Macro 多余的操作
 
 FileRead, Data, %MacroPath%
 
-MsgBox,%Data%
+; NOTE 检查是否是 Macro AHK 文件
+if (!RegExMatch(Data,"; This script was created using Pulover's Macro Creator"))
+    MsgBox, 4, 警告, 当前 AHK 文件不符合 Pulover's Macro Creator 生成的 AHK `n 是否执行
+    IfMsgBox No
+        return
+    
+; 用 ahk 读取字符串执行脚本
+; running_command := []
+; running_param := []
+; Loop, Parse, Data, `n  ; Rows are delimited by linefeeds (`n).
+; {	
+;     if A_Index <= 20
+;         Continue
+;     command_list := StrSplit(A_LoopField,",")
+;     param := ""
+;     for k,v in command_list {
+;         if (k = 1) {
+;             StringLower, command, v
+;         }
+;         else
+;         {
+;             param = %param%,%v%
+;         }
+;     }
+;     running_command.Push(command)
+;     running_param.Push(param)
+; }
 
-; TODO 监听剪切板信息
+; for k,command in running_command {
+;     param := running_param[k] 
+;     if (command = "send")
+;         Send %param%
+;     else if (command = "click")
+;         Click %param%
+; }
+
+
+; NOTE 生成临时的 AHK 脚本
+Temp_Script := ""
+Loop, Parse, Data, `n  ; Rows are delimited by linefeeds (`n).
+{	
+    if A_Index < 20
+        Continue
+    
+    if RegExMatch(A_LoopField, "^Return"){
+        Temp_Script = %Temp_Script%ExitApp,0
+        break
+    }
+    else
+        Temp_Script = %Temp_Script%%A_LoopField%
+
+}
+
+EnvGet, Temp , temp
+script_path = %Temp%\AutoValidate_temp.ahk
+Filedelete, %script_path%
+FileAppend, %Temp_Script%, %script_path%
+
+; NOTE 优化 Macro 多余的操作
+clipboard_collection := []
+clipboard_capture := false
+RunWait, %A_ScriptDir%\AutoHotkeyU32.exe %script_path%
+clipboard_capture := true
+
 ; TODO 通过监听函数比对数据
+for k,v in clipboard_collection {
+    if k = 1
+        Continue
+    MsgBox, %v%
+}
+
 
 
 return
 
+
+OnClipboardChange:
+if clipboard_capture
+    return
+; NOTE 监听复制信息
+clipboard_collection.Push(clipboard)
+return
 
 
 #If WinActive("ahk_id" . Win_ID)
